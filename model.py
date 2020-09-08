@@ -7,12 +7,14 @@ from losses import losses
 from collections import OrderedDict
 
 class Encoder(nn.Module):
-    def __init__(self, ngf=32, z_len=512):
+
+    def __init__(self, ngf=32, z_dim=512):
         super(Encoder, self).__init__()
 
         self.f_dim = ngf
-        self.z_len = z_len
+        self.z_dim = z_dim
         self.input_dim = 3
+    
         self.conv0 = nn.Sequential(
             nn.Conv2d(self.input_dim, self.f_dim,
                       kernel_size=4, stride=2, padding=1),
@@ -37,18 +39,18 @@ class Encoder(nn.Module):
             nn.InstanceNorm2d(self.f_dim * 8, affine=False),
             nn.ELU(),
         )
-
         self.conv4 = nn.Sequential(
             nn.Conv2d(self.f_dim * 8, self.f_dim * 16,
                       kernel_size=4, stride=2, padding=1),
             nn.InstanceNorm2d(self.f_dim * 16, affine=False),
             nn.ELU(),
         )
+
         self.fc_mu = nn.Sequential(
-            nn.Linear(self.f_dim * 16 * 4 * 4 , self.z_len)
+            nn.Linear(self.f_dim * 16 * 4 * 4 , self.z_dim)
         )
         self.fc_logvar = nn.Sequential(
-            nn.Linear(self.f_dim * 16 * 4 * 4, self.z_len)
+            nn.Linear(self.f_dim * 16 * 4 * 4, self.z_dim)
         )
 
     def forward(self, img):
@@ -57,6 +59,9 @@ class Encoder(nn.Module):
         e2 = self.conv2(e1)
         e3 = self.conv3(e2)
         e4 = self.conv4(e3)
+
+        e4 = e4.view(e4.shape[0], -1)
+
         fc_mu = self.fc_mu(e4)
         logvar = self.fc_logvar(e4)
 
@@ -64,14 +69,13 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, ngf=32, z_len=512):
+
+    def __init__(self, ngf=32, z_dim=512):
         super(Decoder, self).__init__()
-        self.z_dim = z_len
+        self.z_dim = z_dim
         self.f_dim = ngf
         self.lin0 = nn.Sequential(
-            nn.Linear(self.z_len, self.f_dim * 16 * 4 * 4),
-            nn.InstanceNorm2d(self.self.f_dim * 16 * 4 * 4, affine=False),
-            nn.ELU(),
+            nn.Linear(self.z_dim, self.f_dim * 16 * 4 * 4)
         )
         self.conv0 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim * 16, self.f_dim * 8,
@@ -106,15 +110,20 @@ class Decoder(nn.Module):
     def forward(self, z):
 
         dec1 = self.lin0(z)
-        dec2 = self.conv0(dec1.view(dec1.shape[0], -1))
+
+        dec1 = dec1.view(dec1.shape[0], self.f_dim * 16, 4, 4)
+    
+        dec2 = self.conv0(dec1)
         dec3 = self.conv1(dec2)
         dec4 = self.conv2(dec3)
         dec5 = self.conv3(dec4)
         instance = self.conv4(dec5)
+
         return instance
 
 
 class Discriminator(nn.Module):
+
     def __init__(self, input_nc=6, ndf=32, n_layers=3, norm_layer=nn.InstanceNorm2d,
                  use_sigmoid=False, num_D=1, getIntermFeat=False,
                  use_sn_discriminator=False):
@@ -138,9 +147,13 @@ class Discriminator(nn.Module):
         self.downsample = nn.AvgPool2d(3, stride=2, padding=[1, 1],
                                        count_include_pad=False)
 
+    def forward(self, fake, real):
+
+
 
 # Defines the PatchGAN discriminator with the specified arguments.
 class NLayerDiscriminator(nn.Module):
+
     def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d, use_sigmoid=False, getIntermFeat=False,
                  use_sn_discriminator=False):
         super(NLayerDiscriminator, self).__init__()
@@ -192,6 +205,7 @@ class NLayerDiscriminator(nn.Module):
         else:
             return self.model(input)
 
+
 class VaeGanModule(pl.LightningModule):
 
     def __init__(self, hparams):
@@ -199,23 +213,23 @@ class VaeGanModule(pl.LightningModule):
         self.ngf = hparams.ngf
         self.z_dim = hparams.z_dim
         self.hparams = hparams
-        self.encoder = Encoder(self.ngf, self.z_dim)
-        self.decoder = Decoder(self.ngf, self.z_dim)
+        self.encoder = Encoder(ngf=self.ngf, z_dim=self.z_dim)
+        self.decoder = Decoder(ngf=self.ngf, z_dim=self.z_dim)
         self.discriminator = Discriminator()
         self.criterionFeat = torch.nn.L1Loss()
         self.criterionGAN = losses.GANLoss(gan_mode="lsgan")
 
     def reparameterize(self, mu, logvar, mode):
         if mode == 'train':
-            std = torch.exp(0.5*logvar)
+            std = torch.exp(0.5 * logvar)
             eps = Variable(std.data.new(std.size()).normal_())
-            return mu + eps*std
+            return mu + eps * std
         else:
             return mu
 
     def discriminate(self, fake_image, real_image):
         input_concat_fake = \
-            torch.cat((fake_image.detach(), real_image), dim=1)
+            torch.cat((fake_image.detach(), real_image), dim=1) # non sono sicuro che .detach() sia necessario in lightning
         input_concat_real = \
             torch.cat((real_image, real_image),
                       dim=1)
@@ -224,10 +238,11 @@ class VaeGanModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx, optimizer_idx):
         x, _ = batch
+
         if optimizer_idx == 0:
             # encode
             mu, log_var = self.encoder(x)
-            z_repar = self.reparameterize(mu, log_var)
+            z_repar = self.reparameterize(mu, log_var, mode='train')
             # decode
             fake_image = self.decoder(z_repar)
             # reconstruction
@@ -242,7 +257,7 @@ class VaeGanModule(pl.LightningModule):
             result.log("rec_loss", reconstruction_loss)
             result.log("loss_G_GAN", loss_G_GAN)
             result.log("kld_loss", kld_loss)
-            return result
+
         # train discriminator
         if optimizer_idx == 1:
             # Measure discriminator's ability to classify real from generated samples
@@ -253,8 +268,7 @@ class VaeGanModule(pl.LightningModule):
             fake_image = self.decoder(z_repar)
             # how well can it label as real?
             pred_fake, pred_real = self.discriminate(fake_image, x)
-            loss_D_fake = self.criterionGAN.forward(pred_fake,
-                                                           False)
+            loss_D_fake = self.criterionGAN.forward(pred_fake, False)
 
             # Real Loss
 
@@ -263,17 +277,21 @@ class VaeGanModule(pl.LightningModule):
             result = pl.TrainResult(loss_D)
             result.log("loss_D_real", loss_D_real)
             result.log("loss_D_fake", loss_D_fake)
-            return result
+        
+        return result
 
     def validation_step(self, batch, batch_idx):
         x, _ = batch
-        x = x.view(x.size(0), -1)
-        z = self.encoder(x)
-        recons = self.decoder(z)
+
+        mu, log_var = self.encoder(x)
+        z_repar = self.reparameterize(mu, log_var, mode='train')
+        recons = self.decoder(z_repar)
         reconstruction_loss = nn.functional.mse_loss(recons, x)
 
         result = pl.EvalResult(checkpoint_on=reconstruction_loss)
         return result
+
+    testing_step = validation_step
 
     def configure_optimizers(self):
         lr = self.hparams.lr
@@ -287,7 +305,15 @@ class VaeGanModule(pl.LightningModule):
 
     @staticmethod
     def add_argparse_args(parser):
-        # add some arguments to the cmd that
-        # are need by this model
-        # parser.add_argument("--number_layers", type=int, ...)
+
+        parser.add_argument('--ngf', type=int, default=128)
+        parser.add_argument('--z_dim', type=int, default=128)
+
+        parser.add_argument('--b1', type=float, default=0.0,
+                             help='momentum term of adam')
+        parser.add_argument('--b2', type=float, default=0.9,
+                             help='momentum term of adam')
+        parser.add_argument('--lr', type=float, default=0.0002,
+                        help='initial learning rate for adam')
+
         return parser

@@ -26,14 +26,10 @@ class CelebaDataModule(LightningDataModule):
             dataset = CelebADataModule('data/')
             model = StupidModel()
             Trainer().fit(model, dataset)
-        Args:
-            data_dir: where to save/load the data
-            val_split: how many of the training images to use for the validation split
-            num_workers: how many workers to use for loading data
-            normalize: If true applies image normalize
         """
         super().__init__(*args, **kwargs)
         self.hparams = hparams
+        self.transforms = self._default_transforms()
 
     def prepare_data(self):
         """
@@ -41,17 +37,13 @@ class CelebaDataModule(LightningDataModule):
         """
         # We can use an image folder dataset the way we have it setup.
         # Create the dataset
-        transforms = self._default_transforms()
-        dataset = torchvision.datasets.ImageFolder(self.hparams.data_dir,
-                                         transform=transforms,
-                                         target_transform=None,
-                                         loader=None,
-                                         is_valid_file=None)
+        dataset = torchvision.datasets.ImageFolder(self.hparams.data_dir, transform=self.transforms)
 
         self.train, self.valid, self.test = \
-            torch.utils.data.random_split(dataset, [len(dataset) - self.hparams.val_split - self.hparams.test_split, 
-                                                    self.hparams.val_split,
-                                                    self.hparams.test_split])
+            torch.utils.data.random_split(dataset, 
+                                          [len(dataset) - self.hparams.val_split - self.hparams.test_split, 
+                                           self.hparams.val_split,
+                                           self.hparams.test_split])
 
         """
         dataset = torchvision.datasets.CelebA(self.hparams.data_dir,
@@ -70,6 +62,7 @@ class CelebaDataModule(LightningDataModule):
             self.train,
             batch_size=self.hparams.batch_size,
             shuffle=True,
+            #transforms=transforms,
             num_workers=self.hparams.num_workers,
             drop_last=True,
             pin_memory=True
@@ -81,7 +74,7 @@ class CelebaDataModule(LightningDataModule):
         CelebA valid set
         """
         loader = DataLoader(
-            self.train,
+            self.valid,
             batch_size=self.hparams.batch_size,
             shuffle=False,
             num_workers=self.hparams.num_workers,
@@ -95,7 +88,7 @@ class CelebaDataModule(LightningDataModule):
         CelebA test set
         """
         loader = DataLoader(
-            self.train,
+            self.test,
             batch_size=self.hparams.batch_size,
             shuffle=False,
             num_workers=self.hparams.num_workers,
@@ -112,6 +105,7 @@ class CelebaDataModule(LightningDataModule):
             transforms.RandomHorizontalFlip(),
             transforms.CenterCrop(178),
             transforms.Resize(128),
+            transforms.ToTensor(),
             transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         ])
         return res
