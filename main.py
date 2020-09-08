@@ -11,6 +11,8 @@ def main(hparams):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
+    parser.add_argument('--ngf', type=int, default=128)
+    parser.add_argument('--z_dim', type=int, default=128)
     parser = Trainer.add_argparse_args(parser)
     parser = VaeGanModule.add_argparse_args(parser)
     parser = CelebaDataModule.add_dataloader_args(parser)
