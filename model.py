@@ -266,6 +266,7 @@ class VaeGanModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, _ = batch
+        x = x.view(x.size(0), -1)
         z = self.encoder(x)
         recons = self.decoder(z)
         reconstruction_loss = nn.functional.mse_loss(recons, x)
