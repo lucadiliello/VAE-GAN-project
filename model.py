@@ -148,7 +148,7 @@ class Discriminator(nn.Module):
                                        count_include_pad=False)
 
     def forward(self, fake, real):
-
+        pass # mancava LOL
 
 
 # Defines the PatchGAN discriminator with the specified arguments.
