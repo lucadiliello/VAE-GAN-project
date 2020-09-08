@@ -198,6 +198,7 @@ class VaeGanModule(pl.LightningModule):
         super().__init__()
         self.ngf = hparams.ngf
         self.z_dim = hparams.z_dim
+        self.hparams = hparams
         self.encoder = Encoder(self.ngf, self.z_dim)
         self.decoder = Decoder(self.ngf, self.z_dim)
         self.discriminator = Discriminator()
@@ -275,7 +276,14 @@ class VaeGanModule(pl.LightningModule):
         return result
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=0.0002)
+        lr = self.hparams.lr
+        b1 = self.hparams.b1
+        b2 = self.hparams.b2
+        params_vae = list(self.encoder.parameters()) + \
+                          list(self.decoder.parameters())
+        opt_vae = torch.optim.Adam(params_vae, lr=lr, betas=(b1, b2))
+        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=lr, betas=(b1, b2))
+        return [opt_vae, opt_d], []
 
     @staticmethod
     def add_argparse_args(parser):
