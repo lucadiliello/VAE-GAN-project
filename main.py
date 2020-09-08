@@ -5,7 +5,7 @@ from pytorch_lightning import Trainer
 
 def main(hparams):
     data = CelebaDataModule(hparams)
-    model = VaeGanModule()
+    model = VaeGanModule(hparams)
     trainer = Trainer.from_argparse_args(hparams)
     trainer.fit(model, data)
 

@@ -3,8 +3,9 @@ from torch import nn
 
 class VaeGanModule(pl.LightningModule):
 
-    def __init__(self, latent_dim=2):
+    def __init__(self, hparams):
         super().__init__()
+        self.hparams = hparams
         self.encoder = nn.Sequential(
             nn.Linear(28 * 28, 256),
             nn.ReLU(),
