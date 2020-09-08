@@ -1,23 +1,22 @@
 from pytorch_lightning import LightningDataModule
+from torchvision import transforms
+import torchvision
+import torch
+from torch.utils.data import DataLoader
 
-class CelebADataModule(LightningDataModule):
+class CelebaDataModule(LightningDataModule):
 
     name = 'CelebA'
 
     def __init__(
         self,
-        data_dir: str,
-        val_split: int = 5000,
-        num_workers: int = 16,
-        normalize: bool = False,
-        seed: int = 42,
+        hparams,
         *args,
         **kwargs,
     ):
         """
         Specs:
-            - ?? classes
-            - Each image is (1 x ?? x ??)
+            - Each image is (3 x 218 x 178)
         Transforms::
             mnist_transforms = transform_lib.Compose([
                 transform_lib.ToTensor()
@@ -34,106 +33,101 @@ class CelebADataModule(LightningDataModule):
             normalize: If true applies image normalize
         """
         super().__init__(*args, **kwargs)
-        self.dims = (1, 28, 28)
-        self.data_dir = data_dir
-        self.val_split = val_split
-        self.num_workers = num_workers
-        self.normalize = normalize
-        self.seed = seed
-
-    @property
-    def num_classes(self):
-        """
-        Return:
-            ??
-        """
-        return -1
+        self.hparams = hparams
 
     def prepare_data(self):
         """
         Saves MNIST files to data_dir
         """
-        MNIST(self.data_dir, train=True, download=True, transform=transform_lib.ToTensor())
-        MNIST(self.data_dir, train=False, download=True, transform=transform_lib.ToTensor())
+        # We can use an image folder dataset the way we have it setup.
+        # Create the dataset
+        transforms = self._default_transforms()
+        dataset = torchvision.datasets.ImageFolder(self.hparams.data_dir,
+                                         transform=transforms,
+                                         target_transform=None,
+                                         loader=None,
+                                         is_valid_file=None)
 
-    def train_dataloader(self, batch_size=32, transforms=None):
-        """
-        MNIST train set removes a subset to use for validation
-        Args:
-            batch_size: size of batch
-            transforms: custom transforms
-        """
-        transforms = transforms or self.train_transforms or self._default_transforms()
+        self.train, self.valid, self.test = \
+            torch.utils.data.random_split(dataset, [len(dataset) - self.hparams.val_split - self.hparams.test_split, 
+                                                    self.hparams.val_split,
+                                                    self.hparams.test_split])
 
-        dataset = MNIST(self.data_dir, train=True, download=False, transform=transforms)
-        train_length = len(dataset)
-        dataset_train, _ = random_split(
-            dataset,
-            [train_length - self.val_split, self.val_split],
-            generator=torch.Generator().manual_seed(self.seed)
-        )
+        """
+        dataset = torchvision.datasets.CelebA(self.hparams.data_dir,
+                                              split='all',
+                                              target_type=None,
+                                              transform=transforms,
+                                              target_transform=None,
+                                              download=False)
+        """
+
+    def train_dataloader(self):
+        """
+        CelebA train set
+        """
         loader = DataLoader(
-            dataset_train,
-            batch_size=batch_size,
+            self.train,
+            batch_size=self.hparams.batch_size,
             shuffle=True,
-            num_workers=self.num_workers,
+            num_workers=self.hparams.num_workers,
             drop_last=True,
             pin_memory=True
         )
         return loader
 
-    def val_dataloader(self, batch_size=32, transforms=None):
+    def val_dataloader(self):
         """
-        MNIST val set uses a subset of the training set for validation
-        Args:
-            batch_size: size of batch
-            transforms: custom transforms
+        CelebA valid set
         """
-        transforms = transforms or self.val_transforms or self._default_transforms()
-        dataset = MNIST(self.data_dir, train=True, download=True, transform=transforms)
-        train_length = len(dataset)
-        _, dataset_val = random_split(
-            dataset,
-            [train_length - self.val_split, self.val_split],
-            generator=torch.Generator().manual_seed(self.seed)
-        )
         loader = DataLoader(
-            dataset_val,
-            batch_size=batch_size,
+            self.train,
+            batch_size=self.hparams.batch_size,
             shuffle=False,
-            num_workers=self.num_workers,
-            drop_last=True,
+            num_workers=self.hparams.num_workers,
+            drop_last=False,
             pin_memory=True
         )
         return loader
 
-    def test_dataloader(self, batch_size=32, transforms=None):
+    def test_dataloader(self):
         """
-        MNIST test set uses the test split
-        Args:
-            batch_size: size of batch
-            transforms: custom transforms
+        CelebA test set
         """
-        transforms = transforms or self.val_transforms or self._default_transforms()
-
-        dataset = MNIST(self.data_dir, train=False, download=False, transform=transforms)
         loader = DataLoader(
-            dataset,
-            batch_size=batch_size,
+            self.train,
+            batch_size=self.hparams.batch_size,
             shuffle=False,
-            num_workers=self.num_workers,
-            drop_last=True,
+            num_workers=self.hparams.num_workers,
+            drop_last=False,
             pin_memory=True
         )
         return loader
 
     def _default_transforms(self):
-        if self.normalize:
-            mnist_transforms = transform_lib.Compose([
-                transform_lib.ToTensor(),
-                transform_lib.Normalize(mean=(0.5,), std=(0.5,)),
-            ])
-        else:
-            mnist_transforms = transform_lib.ToTensor()
+        """
+        Apply recommended transformations for CelebA
+        """
+        res = transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.CenterCrop(178),
+            transforms.Resize(128),
+            transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+        ])
+        return res
 
-        return mnist_transforms
+    @staticmethod
+    def add_dataloader_args(parser):
+        parser.add_argument("--batch_size", type=int, default=32)
+
+        parser.add_argument("--dims", type=tuple, nargs="+", default=[1, 28, 28])
+        parser.add_argument("--data_dir", type=str, default="./data")
+
+        parser.add_argument("--val_split", type=int, default=10000)
+        parser.add_argument("--test_split", type=int, default=20000)
+
+        parser.add_argument("--num_workers", type=int, default=16)
+
+        parser.add_argument("--normalize", action="store_true")
+        parser.add_argument("--seed", type=int, default=42)
+        return parser
