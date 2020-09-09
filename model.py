@@ -264,7 +264,9 @@ class VaeGanModule(pl.LightningModule):
         self.hparams = hparams
         self.encoder = Encoder(ngf=self.ngf, z_dim=self.z_dim)
         self.encoder.apply(weights_init)
+        summary(self.encoder.cuda(), (3,128,128))
         self.decoder = Decoder(ngf=self.ngf, z_dim=self.z_dim)
+        summary(self.decoder.cuda(), (512,))
         self.decoder.apply(weights_init)
         self.discriminator = Discriminator()
         self.discriminator.apply(weights_init)
