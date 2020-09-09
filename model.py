@@ -317,10 +317,10 @@ class VaeGanModule(pl.LightningModule):
         if self.on_gpu:
             z_appr = z_appr.cuda(self.last_imgs.device.index)
         sample_imgs = self.decoder(z_appr)
-        grid = torchvision.utils.make_grid(sample_imgs)
+        grid = torchvision.utils.make_grid(sample_imgs, normalize=True, range=(-1,1))
         torchvision.utils.save_image(sample_imgs, f"generated_images_{self.current_epoch}.png", normalize=True, range=(-1,1))
         self.logger.experiment.add_image(f'generated_images', grid,
-                                         self.current_epoch, normalize=True, range=(-1,1))
+                                         self.current_epoch)
 
     def configure_optimizers(self):
         lr = self.hparams.lr
