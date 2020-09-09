@@ -267,7 +267,7 @@ class VaeGanModule(pl.LightningModule):
         self.encoder.apply(weights_init)
         summary(self.encoder.cuda(), (3,128,128))
         self.decoder = Decoder(ngf=self.ngf, z_dim=self.z_dim)
-        summary(self.decoder.cuda(), (512,))
+        summary(self.decoder.cuda(), (self.z_dim,))
         self.decoder.apply(weights_init)
         self.discriminator = Discriminator()
         self.discriminator.apply(weights_init)
