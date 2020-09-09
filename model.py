@@ -89,32 +89,46 @@ class Decoder(nn.Module):
             nn.ELU(),
         )
         self.conv1 = nn.Sequential(
-            nn.ConvTranspose2d(self.f_dim * 16, self.f_dim * 8,
-                      kernel_size=4, stride=2, padding=1),
+            nn.ReflectionPad2d(1),
+            nn.Conv2d(self.f_dim * 16, self.f_dim * 32,
+                      kernel_size=3, stride=1, padding=0),
+            nn.PixelShuffle(2),
             nn.InstanceNorm2d(self.f_dim * 8, affine=False),
             nn.ELU(),
         )
         self.conv2 = nn.Sequential(
-            nn.ConvTranspose2d(self.f_dim * 8, self.f_dim * 4,
-                      kernel_size=4, stride=2, padding=1),
+            nn.ReflectionPad2d(1),
+            nn.Conv2d(self.f_dim * 8, self.f_dim * 16,
+                      kernel_size=3, stride=1, padding=0),
+            nn.PixelShuffle(2),
             nn.InstanceNorm2d(self.f_dim * 4, affine=False),
             nn.ELU(),
         )
         self.conv3 = nn.Sequential(
-            nn.ConvTranspose2d(self.f_dim * 4, self.f_dim * 2,
-                      kernel_size=4, stride=2, padding=1),
+            nn.ReflectionPad2d(1),
+            nn.Conv2d(self.f_dim * 4, self.f_dim * 8,
+                      kernel_size=3, stride=1, padding=0),
+            nn.PixelShuffle(2),
             nn.InstanceNorm2d(self.f_dim * 2, affine=False),
             nn.ELU(),
         )
         self.conv4 = nn.Sequential(
-            nn.ConvTranspose2d(self.f_dim * 2, self.f_dim,
-                      kernel_size=4, stride=2, padding=1),
+            nn.ReflectionPad2d(1),
+            nn.ConvTranspose2d(self.f_dim * 2, self.f_dim * 4,
+                      kernel_size=3, stride=1, padding=0),
+            nn.PixelShuffle(2),
             nn.InstanceNorm2d(self.f_dim, affine=False),
-            nn.ELU(),
+            nn.ELU()
         )
         self.conv5 = nn.Sequential(
-            nn.ConvTranspose2d(self.f_dim, 3,
-                      kernel_size=4, stride=2, padding=1),
+            nn.ReflectionPad2d(1),
+            nn.ConvTranspose2d(self.f_dim, self.f_dim * 4,
+                               kernel_size=3, stride=1, padding=0),
+            nn.PixelShuffle(2),
+            nn.InstanceNorm2d(self.f_dim, affine=False),
+            nn.ELU(),
+            nn.Conv2d(self.f_dim, 3,
+                      kernel_size=3, stride=1, padding=0),
             nn.Tanh(),
         )
 
@@ -257,6 +271,9 @@ class VaeGanModule(pl.LightningModule):
         self.criterionFeat = torch.nn.L1Loss()
         self.criterionGAN = losses.GANLoss(gan_mode="lsgan")
         self.last_imgs = None
+        if self.hparams.use_vgg:
+            self.criterion_perceptual_style = \
+                losses.Perceptual_Loss()
 
     def reparameterize(self, mu, logvar, mode):
         if mode == 'train':
@@ -291,11 +308,17 @@ class VaeGanModule(pl.LightningModule):
                 torch.cat((fake_image, x), dim=1)
             pred_fake = self.discriminator.forward(input_concat_fake)
             loss_G_GAN = self.criterionGAN(pred_fake, True)
-            g_loss = (reconstruction_loss * 10) + kld_loss + loss_G_GAN
+            if self.hparams.use_vgg:
+                loss_G_perceptual = \
+                    self.criterion_perceptual_style(fake_image, x)
+            else:
+                loss_G_perceptual = 0.0
+            g_loss = (reconstruction_loss * 10) + kld_loss + loss_G_GAN + loss_G_perceptual
             result = pl.TrainResult(g_loss)
             result.log("rec_loss", reconstruction_loss * 10, prog_bar=True)
             result.log("loss_G_GAN", loss_G_GAN, prog_bar=True)
             result.log("kld_loss", kld_loss, prog_bar=True)
+            result.log("loss_G_perceptual", loss_G_perceptual, prog_bar=True)
 
         # train discriminator
         if optimizer_idx == 1:
