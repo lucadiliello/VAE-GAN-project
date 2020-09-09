@@ -250,7 +250,9 @@ class VaeGanModule(pl.LightningModule):
             kld_loss = torch.mean(
                 -0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1),
                 dim=0)
-            pred_fake = self.discriminator(fake_image, x)
+            input_concat_fake = \
+                torch.cat((fake_image, x), dim=1)
+            pred_fake = self.discriminator(input_concat_fake)
             loss_G_GAN = self.criterionGAN(pred_fake, True)
             g_loss = reconstruction_loss + kld_loss + loss_G_GAN
             result = pl.TrainResult(g_loss)
@@ -263,7 +265,7 @@ class VaeGanModule(pl.LightningModule):
             # Measure discriminator's ability to classify real from generated samples
             # encode
             mu, log_var = self.encoder(x)
-            z_repar = self.reparameterize(mu, log_var)
+            z_repar = self.reparameterize(mu, log_var, mode="train")
             # decode
             fake_image = self.decoder(z_repar)
             # how well can it label as real?
