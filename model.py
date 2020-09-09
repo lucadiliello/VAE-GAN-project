@@ -282,9 +282,9 @@ class VaeGanModule(pl.LightningModule):
             loss_G_GAN = self.criterionGAN(pred_fake, True)
             g_loss = reconstruction_loss + kld_loss + loss_G_GAN
             result = pl.TrainResult(g_loss)
-            result.log("rec_loss", reconstruction_loss)
-            result.log("loss_G_GAN", loss_G_GAN)
-            result.log("kld_loss", kld_loss)
+            result.log("rec_loss", reconstruction_loss, prog_bar=True)
+            result.log("loss_G_GAN", loss_G_GAN, prog_bar=True)
+            result.log("kld_loss", kld_loss, prog_bar=True)
 
         # train discriminator
         if optimizer_idx == 1:
@@ -303,8 +303,8 @@ class VaeGanModule(pl.LightningModule):
             loss_D_real = self.criterionGAN(pred_real, True)
             loss_D = (loss_D_fake + loss_D_real) * 0.5
             result = pl.TrainResult(loss_D)
-            result.log("loss_D_real", loss_D_real)
-            result.log("loss_D_fake", loss_D_fake)
+            result.log("loss_D_real", loss_D_real, prog_bar=True)
+            result.log("loss_D_fake", loss_D_fake, prog_bar=True)
         
         return result
 
