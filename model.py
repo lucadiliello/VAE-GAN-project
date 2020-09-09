@@ -379,5 +379,6 @@ class VaeGanModule(pl.LightningModule):
 
         parser.add_argument('--ngf', type=int, default=128)
         parser.add_argument('--z_dim', type=int, default=128)
+        parser.add_argument("--use_vgg", action="store_true", default=False)
 
         return parser
