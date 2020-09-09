@@ -27,7 +27,7 @@ class Encoder(nn.Module):
         self.f_dim = ngf
         self.z_dim = z_dim
         self.input_dim = 3
-    
+
         self.conv0 = nn.Sequential(
             nn.Conv2d(self.input_dim, self.f_dim,
                       kernel_size=4, stride=2, padding=1),
@@ -46,30 +46,33 @@ class Encoder(nn.Module):
             nn.InstanceNorm2d(self.f_dim * 4, affine=False),
             nn.ELU(),
         )
-        self.fc1 = nn.Sequential(nn.Linear(in_features=8 * 8 * self.f_dim * 4, out_features=4096, bias=False),
-                                nn.BatchNorm1d(num_features=4096),
-                                nn.ReLU(True))
-        self.fc2 = nn.Sequential(
-            nn.Linear(in_features=4096, out_features=1024,
-                      bias=False),
-            nn.BatchNorm1d(num_features=1024),
-            nn.ReLU(True))
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(self.f_dim * 4, self.f_dim * 8,
+                      kernel_size=4, stride=2, padding=1),
+            nn.InstanceNorm2d(self.f_dim * 8, affine=False),
+            nn.ELU(),
+        )
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(self.f_dim * 8, self.f_dim * 16,
+                      kernel_size=4, stride=2, padding=1),
+            nn.InstanceNorm2d(self.f_dim * 8, affine=False),
+            nn.ELU(),
+        )
         self.fc_mu = nn.Sequential(
-            nn.Linear(1024, self.z_dim)
+            nn.Conv2d(self.f_dim * 16, self.z_dim, kernel_size=4, stride=1, padding=0)
         )
         self.fc_logvar = nn.Sequential(
-            nn.Linear(1024, self.z_dim)
+            nn.Conv2d(self.f_dim * 16, self.z_dim, kernel_size=4, stride=1, padding=0)
         )
 
     def forward(self, img):
         e0 = self.conv0(img)
         e1 = self.conv1(e0)
         e2 = self.conv2(e1)
-        e2 = e2.view(e2.shape[0], -1)
-        e3 = self.fc1(e2)
-        e4 = self.fc2(e3)
-        fc_mu = self.fc_mu(e4)
-        logvar = self.fc_logvar(e4)
+        e3 = self.conv3(e2)
+        e4 = self.conv4(e3)
+        fc_mu = self.fc_mu(e4).squeeze(2).squeeze(2)
+        logvar = self.fc_logvar(e4).squeeze(2).squeeze(2)
 
         return fc_mu, logvar
 
@@ -80,41 +83,50 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.z_dim = z_dim
         self.f_dim = ngf
-        self.lin0 = nn.Sequential(
-            nn.Linear(self.z_dim, 4096),
-            nn.ELU()
-        )
-        self.lin1 = nn.Sequential(
-            nn.Linear(4096, self.f_dim * 4 * 8 * 8),
-            nn.ELU()
-        )
         self.conv0 = nn.Sequential(
+            nn.ConvTranspose2d(self.z_dim, self.f_dim * 16, kernel_size=4, stride=1, padding=0),
+            nn.InstanceNorm2d(self.f_dim * 16, affine=False),
+            nn.ELU(),
+        )
+        self.conv1 = nn.Sequential(
+            nn.ConvTranspose2d(self.f_dim * 16, self.f_dim * 8,
+                      kernel_size=4, stride=2, padding=1),
+            nn.InstanceNorm2d(self.f_dim * 8, affine=False),
+            nn.ELU(),
+        )
+        self.conv2 = nn.Sequential(
+            nn.ConvTranspose2d(self.f_dim * 8, self.f_dim * 4,
+                      kernel_size=4, stride=2, padding=1),
+            nn.InstanceNorm2d(self.f_dim * 4, affine=False),
+            nn.ELU(),
+        )
+        self.conv3 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim * 4, self.f_dim * 2,
                       kernel_size=4, stride=2, padding=1),
             nn.InstanceNorm2d(self.f_dim * 2, affine=False),
             nn.ELU(),
         )
-        self.conv1 = nn.Sequential(
+        self.conv4 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim * 2, self.f_dim,
                       kernel_size=4, stride=2, padding=1),
             nn.InstanceNorm2d(self.f_dim, affine=False),
             nn.ELU(),
         )
-        self.conv2 = nn.Sequential(
+        self.conv5 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim, 3,
                       kernel_size=4, stride=2, padding=1),
-            nn.Tanh()
+            nn.Tanh(),
         )
 
     def forward(self, z):
 
-        dec0 = self.lin0(z)
-        dec1 = self.lin1(dec0)
-        dec1 = dec1.view(dec1.shape[0], self.f_dim * 4, 8 , 8)
-    
-        dec2 = self.conv0(dec1)
-        dec3 = self.conv1(dec2)
-        instance = self.conv2(dec3)
+        dec0 = self.conv0(z.unsqueeze(2).unsqueeze(2))
+        dec1 = self.conv1(dec0)
+        dec2 = self.conv2(dec1)
+        dec3 = self.conv3(dec2)
+        dec4 = self.conv4(dec3)
+        instance = self.conv5(dec4)
+
 
         return instance
 
@@ -249,7 +261,7 @@ class VaeGanModule(pl.LightningModule):
     def reparameterize(self, mu, logvar, mode):
         if mode == 'train':
             std = torch.exp(0.5 * logvar)
-            eps = Variable(std.data.new(std.size()).normal_())
+            eps = torch.randn_like(std)
             return mu + eps * std
         else:
             return mu
@@ -274,9 +286,7 @@ class VaeGanModule(pl.LightningModule):
             fake_image = self.decoder(z_repar)
             # reconstruction
             reconstruction_loss = self.criterionFeat(fake_image, x)
-            kld_loss = torch.mean(
-                -0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1),
-                dim=0)
+            kld_loss = - 0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
             input_concat_fake = \
                 torch.cat((fake_image, x), dim=1)
             pred_fake = self.discriminator.forward(input_concat_fake)
