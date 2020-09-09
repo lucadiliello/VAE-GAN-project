@@ -147,8 +147,34 @@ class Discriminator(nn.Module):
         self.downsample = nn.AvgPool2d(3, stride=2, padding=[1, 1],
                                        count_include_pad=False)
 
-    def forward(self, fake, real):
-        pass # mancava LOL
+    def singleD_forward(self, model, input):
+        if self.getIntermFeat:
+            result = [input]
+            shapes = [input.shape]
+            for i in range(len(model)):
+                result.append(model[i](result[-1]))
+
+            return result[1:]
+        else:
+            return [model(input)]
+
+    def forward(self, input):
+        num_D = self.num_D
+        result = []
+        shapes = []
+        input_downsampled = input
+        for i in range(num_D):
+            if self.getIntermFeat:
+                model = [getattr(self,
+                                 'scale' + str(num_D - 1 - i) + '_layer' + str(
+                                     j)) for j in range(self.n_layers + 2)]
+            else:
+                model = getattr(self, 'layer' + str(num_D - 1 - i))
+            res = self.singleD_forward(model, input_downsampled)
+            result.append(res)
+            if i != (num_D - 1):
+                input_downsampled = self.downsample(input_downsampled)
+        return result
 
 
 # Defines the PatchGAN discriminator with the specified arguments.
