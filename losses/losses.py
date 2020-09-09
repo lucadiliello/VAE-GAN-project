@@ -68,7 +68,7 @@ class Perceptual_Loss(nn.Module):
         self.criterion = torch.nn.L1Loss()
         self.weights = weights
 
-    def __call__(self, x, y, compute_perceptual, compute_style, normalize = False):
+    def __call__(self, x, y):
         # Compute features
         x_vgg, y_vgg = self.vgg(x), self.vgg(y)
         content_loss = 0.0
