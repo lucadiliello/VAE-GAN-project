@@ -33,7 +33,7 @@ class GANLoss(nn.Module):
             target_tensor = self.fake_label_var
         return target_tensor
 
-    def forward(self, input, target_is_real):
+    def forward(self, input, target_is_real: bool):
         if not isinstance(input, list) and input.shape[0] == 0:
             return 0
         if isinstance(input[0], list):

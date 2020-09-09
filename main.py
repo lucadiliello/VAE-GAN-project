@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from model import VaeGanModule
+from models import VaeGanModule
 from dataloader import CelebaDataModule
 from pytorch_lightning import Trainer
 

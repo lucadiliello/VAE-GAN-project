@@ -1,11 +1,16 @@
+# Platform stuffs
+.vscode/
+.DS_Store
+
+# Data and results
+data/
+lightning_logs/
+output/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-data/
-.vscode/
-.DS_Store
-lightning_logs/
 
 # C extensions
 *.so
