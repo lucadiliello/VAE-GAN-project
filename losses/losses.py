@@ -4,7 +4,7 @@ from collections import namedtuple
 
 class GANLoss(nn.Module):
     def __init__(self, gan_mode = "lsgan", target_real_label=1.0, target_fake_label=0.0,
-                 tensor=torch.cuda.FloatTensor, device="gpu"):
+                 tensor=torch.cuda.FloatTensor, device="cuda"):
         super(GANLoss, self).__init__()
         self.real_label = target_real_label
         self.fake_label = target_fake_label
