@@ -115,9 +115,10 @@ class VaeGanModule(pl.LightningModule):
         return result
 
     def training_epoch_end(self, training_step_outputs):
-        z_appr = torch.FloatTensor(16,
-                                   self.hparams.z_dim,
-                                   device=training_step_outputs[0].minimize.device).normal_(0, 1)
+        z_appr = torch.normal(mean=0,
+                              std=1,
+                              size=(16, self.hparams.z_dim),
+                              device=training_step_outputs[0].minimize.device)
 
         # Generate images from latent vector
         sample_imgs = self.decoder(z_appr)
