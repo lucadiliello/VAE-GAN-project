@@ -127,6 +127,7 @@ class Decoder(nn.Module):
             nn.PixelShuffle(2),
             nn.InstanceNorm2d(self.f_dim, affine=False),
             nn.ELU(),
+            nn.ReflectionPad2d(1),
             nn.Conv2d(self.f_dim, 3,
                       kernel_size=3, stride=1, padding=0),
             nn.Tanh(),
