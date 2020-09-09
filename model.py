@@ -5,6 +5,7 @@ from torch.autograd import Variable
 import numpy as np
 from losses import losses
 from collections import OrderedDict
+import torchvision
 
 class Encoder(nn.Module):
 
@@ -39,18 +40,12 @@ class Encoder(nn.Module):
             nn.InstanceNorm2d(self.f_dim * 8, affine=False),
             nn.ELU(),
         )
-        self.conv4 = nn.Sequential(
-            nn.Conv2d(self.f_dim * 8, self.f_dim * 16,
-                      kernel_size=4, stride=2, padding=1),
-            nn.InstanceNorm2d(self.f_dim * 16, affine=False),
-            nn.ELU(),
-        )
 
         self.fc_mu = nn.Sequential(
-            nn.Linear(self.f_dim * 16 * 4 * 4 , self.z_dim)
+            nn.Linear(self.f_dim * 8 * 4 * 4 , self.z_dim)
         )
         self.fc_logvar = nn.Sequential(
-            nn.Linear(self.f_dim * 16 * 4 * 4, self.z_dim)
+            nn.Linear(self.f_dim * 8 * 4 * 4, self.z_dim)
         )
 
     def forward(self, img):
@@ -58,12 +53,11 @@ class Encoder(nn.Module):
         e1 = self.conv1(e0)
         e2 = self.conv2(e1)
         e3 = self.conv3(e2)
-        e4 = self.conv4(e3)
 
-        e4 = e4.view(e4.shape[0], -1)
+        e3 = e3.view(e3.shape[0], -1)
 
-        fc_mu = self.fc_mu(e4)
-        logvar = self.fc_logvar(e4)
+        fc_mu = self.fc_mu(e3)
+        logvar = self.fc_logvar(e3)
 
         return fc_mu, logvar
 
@@ -75,33 +69,28 @@ class Decoder(nn.Module):
         self.z_dim = z_dim
         self.f_dim = ngf
         self.lin0 = nn.Sequential(
-            nn.Linear(self.z_dim, self.f_dim * 16 * 4 * 4)
+            nn.Linear(self.z_dim, self.f_dim * 8 * 4 * 4),
+            nn.ELU()
         )
         self.conv0 = nn.Sequential(
-            nn.ConvTranspose2d(self.f_dim * 16, self.f_dim * 8,
-                      kernel_size=4, stride=2, padding=1),
-            nn.InstanceNorm2d(self.f_dim * 8, affine=False),
-            nn.ELU(),
-        )
-        self.conv1 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim * 8, self.f_dim * 4,
                       kernel_size=4, stride=2, padding=1),
             nn.InstanceNorm2d(self.f_dim * 4, affine=False),
             nn.ELU(),
         )
-        self.conv2 = nn.Sequential(
+        self.conv1 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim * 4, self.f_dim * 2,
                       kernel_size=4, stride=2, padding=1),
             nn.InstanceNorm2d(self.f_dim * 2, affine=False),
             nn.ELU(),
         )
-        self.conv3 = nn.Sequential(
+        self.conv2 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim * 2, self.f_dim,
                       kernel_size=4, stride=2, padding=1),
             nn.InstanceNorm2d(self.f_dim, affine=False),
             nn.ELU(),
         )
-        self.conv4 = nn.Sequential(
+        self.conv3 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim, 3,
                       kernel_size=4, stride=2, padding=1),
             nn.Tanh()
@@ -116,8 +105,7 @@ class Decoder(nn.Module):
         dec2 = self.conv0(dec1)
         dec3 = self.conv1(dec2)
         dec4 = self.conv2(dec3)
-        dec5 = self.conv3(dec4)
-        instance = self.conv4(dec5)
+        instance = self.conv3(dec4)
 
         return instance
 
@@ -244,6 +232,7 @@ class VaeGanModule(pl.LightningModule):
         self.discriminator = Discriminator()
         self.criterionFeat = torch.nn.L1Loss()
         self.criterionGAN = losses.GANLoss(gan_mode="lsgan")
+        self.last_imgs = None
 
     def reparameterize(self, mu, logvar, mode):
         if mode == 'train':
@@ -264,7 +253,7 @@ class VaeGanModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx, optimizer_idx):
         x, _ = batch
-
+        self.last_imgs = x
         if optimizer_idx == 0:
             # encode
             mu, log_var = self.encoder(x)
@@ -320,6 +309,17 @@ class VaeGanModule(pl.LightningModule):
         return result
 
     testing_step = validation_step
+
+    def on_epoch_end(self):
+        z_appr = torch.FloatTensor(16, self.hparams.z_dim).normal_(0, 1)
+        # match gpu device (or keep as cpu)
+        # log sampled images
+        if self.on_gpu:
+            z_appr = z_appr.cuda(self.last_imgs.device.index)
+        sample_imgs = self.decoder(z_appr)
+        grid = torchvision.utils.make_grid(sample_imgs)
+        self.logger.experiment.add_image(f'generated_images', grid,
+                                         self.current_epoch)
 
     def configure_optimizers(self):
         lr = self.hparams.lr
