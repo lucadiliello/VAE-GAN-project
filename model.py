@@ -7,6 +7,18 @@ from losses import losses
 from collections import OrderedDict
 import torchvision
 
+
+def weights_init(m):
+    classname = m.__class__.__name__
+    if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d, nn.Linear)):
+        m.weight.data.normal_(0.0, 0.02)
+    elif classname.find('BatchNorm2d') != -1:
+        if hasattr(m, 'weight') and m.weight is not None:
+            m.weight.data.normal_(1.0, 0.02)
+        if hasattr(m, 'bias') and m.bias is not None:
+            m.bias.data.fill_(0)
+
+
 class Encoder(nn.Module):
 
     def __init__(self, ngf=32, z_dim=512):
@@ -34,28 +46,23 @@ class Encoder(nn.Module):
             nn.InstanceNorm2d(self.f_dim * 4, affine=False),
             nn.ELU(),
         )
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(self.f_dim * 4, self.f_dim * 8,
-                      kernel_size=4, stride=2, padding=1),
-            nn.InstanceNorm2d(self.f_dim * 8, affine=False),
-            nn.ELU(),
-        )
+        self.fc = nn.Sequential(nn.Linear(in_features=8 * 8 * 128, out_features=1024, bias=False),
+                                nn.BatchNorm1d(num_features=1024,momentum=0.9),
+                                nn.ReLU(True))
 
         self.fc_mu = nn.Sequential(
-            nn.Linear(self.f_dim * 8 * 4 * 4 , self.z_dim)
+            nn.Linear(1024, self.z_dim)
         )
         self.fc_logvar = nn.Sequential(
-            nn.Linear(self.f_dim * 8 * 4 * 4, self.z_dim)
+            nn.Linear(1024, self.z_dim)
         )
 
     def forward(self, img):
         e0 = self.conv0(img)
         e1 = self.conv1(e0)
         e2 = self.conv2(e1)
-        e3 = self.conv3(e2)
-
-        e3 = e3.view(e3.shape[0], -1)
-
+        e2 = e2.view(e2.shape[0], -1)
+        e3 = self.fc(e2)
         fc_mu = self.fc_mu(e3)
         logvar = self.fc_logvar(e3)
 
@@ -69,28 +76,22 @@ class Decoder(nn.Module):
         self.z_dim = z_dim
         self.f_dim = ngf
         self.lin0 = nn.Sequential(
-            nn.Linear(self.z_dim, self.f_dim * 8 * 4 * 4),
+            nn.Linear(self.z_dim, 128 * 8 * 8),
             nn.ELU()
         )
         self.conv0 = nn.Sequential(
-            nn.ConvTranspose2d(self.f_dim * 8, self.f_dim * 4,
-                      kernel_size=4, stride=2, padding=1),
-            nn.InstanceNorm2d(self.f_dim * 4, affine=False),
-            nn.ELU(),
-        )
-        self.conv1 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim * 4, self.f_dim * 2,
                       kernel_size=4, stride=2, padding=1),
             nn.InstanceNorm2d(self.f_dim * 2, affine=False),
             nn.ELU(),
         )
-        self.conv2 = nn.Sequential(
+        self.conv1 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim * 2, self.f_dim,
                       kernel_size=4, stride=2, padding=1),
             nn.InstanceNorm2d(self.f_dim, affine=False),
             nn.ELU(),
         )
-        self.conv3 = nn.Sequential(
+        self.conv2 = nn.Sequential(
             nn.ConvTranspose2d(self.f_dim, 3,
                       kernel_size=4, stride=2, padding=1),
             nn.Tanh()
@@ -100,12 +101,11 @@ class Decoder(nn.Module):
 
         dec1 = self.lin0(z)
 
-        dec1 = dec1.view(dec1.shape[0], self.f_dim * 8, 4, 4)
+        dec1 = dec1.view(dec1.shape[0], self.f_dim * 4, 8 , 8)
     
         dec2 = self.conv0(dec1)
         dec3 = self.conv1(dec2)
-        dec4 = self.conv2(dec3)
-        instance = self.conv3(dec4)
+        instance = self.conv2(dec3)
 
         return instance
 
@@ -228,8 +228,11 @@ class VaeGanModule(pl.LightningModule):
         self.z_dim = hparams.z_dim
         self.hparams = hparams
         self.encoder = Encoder(ngf=self.ngf, z_dim=self.z_dim)
+        self.encoder.apply(weights_init)
         self.decoder = Decoder(ngf=self.ngf, z_dim=self.z_dim)
+        self.decoder.apply(weights_init)
         self.discriminator = Discriminator()
+        self.discriminator.apply(weights_init)
         self.criterionFeat = torch.nn.L1Loss()
         self.criterionGAN = losses.GANLoss(gan_mode="lsgan")
         self.last_imgs = None
