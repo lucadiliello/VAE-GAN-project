@@ -46,7 +46,7 @@ class Encoder(nn.Module):
             nn.InstanceNorm2d(self.f_dim * 4, affine=False),
             nn.ELU(),
         )
-        self.fc = nn.Sequential(nn.Linear(in_features=8 * 8 * 128, out_features=1024, bias=False),
+        self.fc = nn.Sequential(nn.Linear(in_features=8 * 8 * self.f_dim * 4, out_features=1024, bias=False),
                                 nn.BatchNorm1d(num_features=1024,momentum=0.9),
                                 nn.ReLU(True))
 
@@ -76,7 +76,7 @@ class Decoder(nn.Module):
         self.z_dim = z_dim
         self.f_dim = ngf
         self.lin0 = nn.Sequential(
-            nn.Linear(self.z_dim, 128 * 8 * 8),
+            nn.Linear(self.z_dim, self.f_dim * 4 * 8 * 8),
             nn.ELU()
         )
         self.conv0 = nn.Sequential(
