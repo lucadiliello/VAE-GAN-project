@@ -233,8 +233,8 @@ class VaeGanModule(pl.LightningModule):
         input_concat_real = \
             torch.cat((real_image, real_image),
                       dim=1)
-        return self.discriminator(input_concat_fake), \
-               self.discriminator(input_concat_real)
+        return self.discriminator.forward(input_concat_fake), \
+               self.discriminator.forward(input_concat_real)
 
     def training_step(self, batch, batch_idx, optimizer_idx):
         x, _ = batch
@@ -252,7 +252,7 @@ class VaeGanModule(pl.LightningModule):
                 dim=0)
             input_concat_fake = \
                 torch.cat((fake_image, x), dim=1)
-            pred_fake = self.discriminator(input_concat_fake)
+            pred_fake = self.discriminator.forward(input_concat_fake)
             loss_G_GAN = self.criterionGAN(pred_fake, True)
             g_loss = reconstruction_loss + kld_loss + loss_G_GAN
             result = pl.TrainResult(g_loss)
