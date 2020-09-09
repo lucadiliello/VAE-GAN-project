@@ -46,10 +46,14 @@ class Encoder(nn.Module):
             nn.InstanceNorm2d(self.f_dim * 4, affine=False),
             nn.ELU(),
         )
-        self.fc = nn.Sequential(nn.Linear(in_features=8 * 8 * self.f_dim * 4, out_features=1024, bias=False),
-                                nn.BatchNorm1d(num_features=1024,momentum=0.9),
+        self.fc1 = nn.Sequential(nn.Linear(in_features=8 * 8 * self.f_dim * 4, out_features=4096, bias=False),
+                                nn.BatchNorm1d(num_features=4096),
                                 nn.ReLU(True))
-
+        self.fc2 = nn.Sequential(
+            nn.Linear(in_features=4096, out_features=1024,
+                      bias=False),
+            nn.BatchNorm1d(num_features=1024),
+            nn.ReLU(True))
         self.fc_mu = nn.Sequential(
             nn.Linear(1024, self.z_dim)
         )
@@ -62,9 +66,10 @@ class Encoder(nn.Module):
         e1 = self.conv1(e0)
         e2 = self.conv2(e1)
         e2 = e2.view(e2.shape[0], -1)
-        e3 = self.fc(e2)
-        fc_mu = self.fc_mu(e3)
-        logvar = self.fc_logvar(e3)
+        e3 = self.fc1(e2)
+        e4 = self.fc2(e3)
+        fc_mu = self.fc_mu(e4)
+        logvar = self.fc_logvar(e4)
 
         return fc_mu, logvar
 
@@ -76,7 +81,11 @@ class Decoder(nn.Module):
         self.z_dim = z_dim
         self.f_dim = ngf
         self.lin0 = nn.Sequential(
-            nn.Linear(self.z_dim, self.f_dim * 4 * 8 * 8),
+            nn.Linear(self.z_dim, 4096),
+            nn.ELU()
+        )
+        self.lin1 = nn.Sequential(
+            nn.Linear(4096, self.f_dim * 4 * 8 * 8),
             nn.ELU()
         )
         self.conv0 = nn.Sequential(
@@ -99,8 +108,8 @@ class Decoder(nn.Module):
 
     def forward(self, z):
 
-        dec1 = self.lin0(z)
-
+        dec0 = self.lin0(z)
+        dec1 = self.lin1(dec0)
         dec1 = dec1.view(dec1.shape[0], self.f_dim * 4, 8 , 8)
     
         dec2 = self.conv0(dec1)
@@ -229,9 +238,7 @@ class VaeGanModule(pl.LightningModule):
         self.hparams = hparams
         self.encoder = Encoder(ngf=self.ngf, z_dim=self.z_dim)
         self.encoder.apply(weights_init)
-        summary(self.encoder, (3, 64, 64))
         self.decoder = Decoder(ngf=self.ngf, z_dim=self.z_dim)
-        summary(self.encoder, (512))
         self.decoder.apply(weights_init)
         self.discriminator = Discriminator()
         self.discriminator.apply(weights_init)
