@@ -100,7 +100,7 @@ class Decoder(nn.Module):
 
         dec1 = self.lin0(z)
 
-        dec1 = dec1.view(dec1.shape[0], self.f_dim * 16, 4, 4)
+        dec1 = dec1.view(dec1.shape[0], self.f_dim * 8, 4, 4)
     
         dec2 = self.conv0(dec1)
         dec3 = self.conv1(dec2)
