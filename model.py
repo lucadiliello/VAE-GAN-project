@@ -6,7 +6,7 @@ import numpy as np
 from losses import losses
 from collections import OrderedDict
 import torchvision
-
+from torchsummary import summary
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -229,7 +229,9 @@ class VaeGanModule(pl.LightningModule):
         self.hparams = hparams
         self.encoder = Encoder(ngf=self.ngf, z_dim=self.z_dim)
         self.encoder.apply(weights_init)
+        summary(self.encoder, (3, 64, 64))
         self.decoder = Decoder(ngf=self.ngf, z_dim=self.z_dim)
+        summary(self.encoder, (512))
         self.decoder.apply(weights_init)
         self.discriminator = Discriminator()
         self.discriminator.apply(weights_init)
@@ -326,26 +328,16 @@ class VaeGanModule(pl.LightningModule):
                                          self.current_epoch)
 
     def configure_optimizers(self):
-        lr = self.hparams.lr
-        b1 = self.hparams.b1
-        b2 = self.hparams.b2
         params_vae = list(self.encoder.parameters()) + \
                           list(self.decoder.parameters())
-        opt_vae = torch.optim.Adam(params_vae, lr=lr, betas=(b1, b2))
-        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=lr, betas=(b1, b2))
-        return [opt_vae, opt_d], []
+        opt_vae = torch.optim.Adam(params_vae, lr=1e-3)
+        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=1e-3)
+        return [opt_vae, opt_d]
 
     @staticmethod
     def add_argparse_args(parser):
 
         parser.add_argument('--ngf', type=int, default=128)
         parser.add_argument('--z_dim', type=int, default=128)
-
-        parser.add_argument('--b1', type=float, default=0.0,
-                             help='momentum term of adam')
-        parser.add_argument('--b2', type=float, default=0.9,
-                             help='momentum term of adam')
-        parser.add_argument('--lr', type=float, default=0.001,
-                        help='initial learning rate for adam')
 
         return parser
