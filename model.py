@@ -114,7 +114,7 @@ class Decoder(nn.Module):
         )
         self.conv4 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.ConvTranspose2d(self.f_dim * 2, self.f_dim * 4,
+            nn.Conv2d(self.f_dim * 2, self.f_dim * 4,
                       kernel_size=3, stride=1, padding=0),
             nn.PixelShuffle(2),
             nn.InstanceNorm2d(self.f_dim, affine=False),
@@ -122,7 +122,7 @@ class Decoder(nn.Module):
         )
         self.conv5 = nn.Sequential(
             nn.ReflectionPad2d(1),
-            nn.ConvTranspose2d(self.f_dim, self.f_dim * 4,
+            nn.Conv2d(self.f_dim, self.f_dim * 4,
                                kernel_size=3, stride=1, padding=0),
             nn.PixelShuffle(2),
             nn.InstanceNorm2d(self.f_dim, affine=False),
