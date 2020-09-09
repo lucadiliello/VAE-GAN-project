@@ -272,9 +272,9 @@ class VaeGanModule(pl.LightningModule):
                 torch.cat((fake_image, x), dim=1)
             pred_fake = self.discriminator.forward(input_concat_fake)
             loss_G_GAN = self.criterionGAN(pred_fake, True)
-            g_loss = reconstruction_loss + kld_loss + loss_G_GAN
+            g_loss = (reconstruction_loss * 10) + kld_loss + loss_G_GAN
             result = pl.TrainResult(g_loss)
-            result.log("rec_loss", reconstruction_loss, prog_bar=True)
+            result.log("rec_loss", reconstruction_loss * 10, prog_bar=True)
             result.log("loss_G_GAN", loss_G_GAN, prog_bar=True)
             result.log("kld_loss", kld_loss, prog_bar=True)
 
@@ -345,7 +345,7 @@ class VaeGanModule(pl.LightningModule):
                              help='momentum term of adam')
         parser.add_argument('--b2', type=float, default=0.9,
                              help='momentum term of adam')
-        parser.add_argument('--lr', type=float, default=0.0002,
+        parser.add_argument('--lr', type=float, default=0.001,
                         help='initial learning rate for adam')
 
         return parser
