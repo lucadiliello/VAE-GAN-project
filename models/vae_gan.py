@@ -22,12 +22,12 @@ class VaeGanModule(pl.LightningModule):
         # Encoder
         self.encoder = Encoder(ngf=self.hparams.ngf, z_dim=self.hparams.z_dim)
         self.encoder.apply(weights_init)
-        summary(self.encoder.cuda(), (3,128,128))
+        summary(self.encoder, (3,128,128))
         
         # Decoder
         self.decoder = Decoder(ngf=self.hparams.ngf, z_dim=self.hparams.z_dim)
         self.decoder.apply(weights_init)
-        summary(self.decoder.cuda(), (self.z_dim,))
+        summary(self.decoder, (self.hparams.z_dim,))
         
         # Discriminator
         self.discriminator = Discriminator()
@@ -189,5 +189,6 @@ class VaeGanModule(pl.LightningModule):
         parser.add_argument('--z_dim', type=int, default=128)
         parser.add_argument('--learning_rate_vae', default=1e-03, required=False, type=float)
         parser.add_argument('--learning_rate_d', default=1e-03, required=False, type=float)
+        parser.add_argument("--use_vgg", action="store_true", default=False)
 
         return parser
