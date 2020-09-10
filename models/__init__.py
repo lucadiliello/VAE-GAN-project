@@ -1,0 +1,1 @@
+from models.vae_gan import VaeGanModule

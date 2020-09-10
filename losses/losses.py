@@ -29,15 +29,18 @@ class GANLoss(nn.Module):
             self.real_label_var = torch.Tensor(input.size()).fill_(self.real_label)
             self.real_label_var.requires_grad = False
             target_tensor = self.real_label_var
+
         else:
             self.fake_label_var = torch.Tensor(input.size()).fill_(self.fake_label)
             self.fake_label_var.requires_grad = False
             target_tensor = self.fake_label_var
+
         return target_tensor
 
-    def forward(self, input, target_is_real):
+    def forward(self, input, target_is_real: bool):
         if not isinstance(input, list) and input.shape[0] == 0:
             return 0
+
         if isinstance(input[0], list):
             loss = 0
             for input_i in input:
@@ -51,6 +54,7 @@ class GANLoss(nn.Module):
                     else:
                         loss += torch.mean(pred)
             return loss
+
         else:
             target_tensor = self.get_target_tensor(input[-1], target_is_real)
             return self.loss(input[-1], target_tensor)
