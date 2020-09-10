@@ -1,9 +1,16 @@
+import os
 from argparse import ArgumentParser
-from models import VaeGanModule
-from dataloader import CelebaDataModule
+
 from pytorch_lightning import Trainer
 
+from models import VaeGanModule
+from dataloader import CelebaDataModule
+
 def main(hparams):
+
+    # Prepare folders
+    if not os.path.isdir(hparams.generated_images_folder):
+        os.mkdir(hparams.generated_images_folder)
 
     data = CelebaDataModule(hparams)
     model = VaeGanModule(hparams)
