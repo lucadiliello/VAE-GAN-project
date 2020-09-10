@@ -316,7 +316,7 @@ class VaeGanModule(pl.LightningModule):
                     self.criterion_perceptual_style(fake_image, x)
             else:
                 loss_G_perceptual = 0.0
-            g_loss = (reconstruction_loss * 10) + kld_loss + loss_G_GAN + loss_G_perceptual
+            g_loss = (reconstruction_loss * 20) + kld_loss + loss_G_GAN + loss_G_perceptual
             result = pl.TrainResult(g_loss)
             result.log("rec_loss", reconstruction_loss * 10, prog_bar=True)
             result.log("loss_G_GAN", loss_G_GAN, prog_bar=True)
