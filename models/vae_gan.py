@@ -18,6 +18,7 @@ class VaeGanModule(pl.LightningModule):
     def __init__(self, hparams):
         super().__init__()
         self.hparams = hparams
+
         # Encoder
         self.encoder = Encoder(ngf=self.hparams.ngf, z_dim=self.hparams.z_dim)
         self.encoder.apply(weights_init)
@@ -25,6 +26,7 @@ class VaeGanModule(pl.LightningModule):
         # Decoder
         self.decoder = Decoder(ngf=self.hparams.ngf, z_dim=self.hparams.z_dim)
         self.decoder.apply(weights_init)
+
         # Discriminator
         self.discriminator = Discriminator()
         self.discriminator.apply(weights_init)
