@@ -21,7 +21,7 @@ class VaeGanModule(pl.LightningModule):
         # Encoder
         self.encoder = Encoder(ngf=self.hparams.ngf, z_dim=self.hparams.z_dim)
         self.encoder.apply(weights_init)
-        device = "cuda" if isinstance(self.hparams.gpus, int) else "cpu"
+
         # Decoder
         self.decoder = Decoder(ngf=self.hparams.ngf, z_dim=self.hparams.z_dim)
         self.decoder.apply(weights_init)
@@ -34,7 +34,7 @@ class VaeGanModule(pl.LightningModule):
         self.criterionGAN = GANLoss(gan_mode="lsgan")
 
         if self.hparams.use_vgg:
-            self.criterion_perceptual_style = [Perceptual_Loss(device)]
+            self.criterion_perceptual_style = [Perceptual_Loss()]
 
     @staticmethod
     def reparameterize(mu, logvar, mode='train'):

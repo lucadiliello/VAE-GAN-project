@@ -67,8 +67,9 @@ class Perceptual_Loss(nn.Module):
     """
 
     def __init__(self, weights=[1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]):
-        super(Perceptual_Loss, self).__init__()
-        self.add_module('vgg', VGG19())
+        super().__init__()
+
+        vgg = VGG19()
         self.criterion = torch.nn.L1Loss()
         self.weights = weights
 
