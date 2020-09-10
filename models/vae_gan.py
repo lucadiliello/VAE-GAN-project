@@ -21,7 +21,7 @@ class VaeGanModule(pl.LightningModule):
         # Encoder
         self.encoder = Encoder(ngf=self.hparams.ngf, z_dim=self.hparams.z_dim)
         self.encoder.apply(weights_init)
-        device = "cuda" if isinstance(self.hparams, int) else "cpu"
+        device = "cuda" if isinstance(self.hparams.gpus, int) else "cpu"
         # Decoder
         self.decoder = Decoder(ngf=self.hparams.ngf, z_dim=self.hparams.z_dim)
         self.decoder.apply(weights_init)
